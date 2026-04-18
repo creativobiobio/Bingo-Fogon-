@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Bingo Fogón Nahuelbuta - Versión Final Corregida</title>
+
+<style>
+:root {
+  --naranja: #f37021;
+  --rojo-bingo: #ff0000;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Arial Black', Gadget, sans-serif;
+  background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+  color: white;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fondo de partículas */
+.background { position: fixed; width: 100%; height: 100%; z-index: -1; }
+.background span { position: absolute; bottom: -50px; width: 6px; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 50%; animation: float 10s linear infinite; }
+@keyframes float { from { transform: translateY(0); } to { transform: translateY(-110vh); } }
+
+/* Contenedor Principal */
+.main-area {
+  flex: 1;
+  display: flex;
+  width: 100vw;
+  height: calc(100vh - 100px);
+  box-sizing: border-box;
+  padding: 10px;
+}
+
+/* PANEL IZQUIERDO: Logo, Bola e Input */
+.left {
+  flex: 1.2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vh;
+  padding: 10px;
+  border-right: 1px solid rgba(243, 112, 33, 0.2);
+}
+
+.logo {
+  width: 90%;
+  max-height: 25vh;
+  object-fit: contain;
+}
+
+.ball {
+  width: 28vh; 
+  height: 28vh;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #222;
+  border: 1.5vh solid white;
+  box-shadow: 0 0 40px rgba(255,255,255,0.1);
+  color: white; /* Color inicial */
+}
+
+/* FIX: La letra ahora hereda el color de la bola para no perderse */
+#ball-letter { 
+  font-size: 8vh; 
+  line-height: 0.8; 
+  color: inherit; /* Hereda el negro o blanco según el caso */
+  opacity: 0.9;
+}
+
+#ball-num { font-size: 11vh; font-weight: 900; line-height: 1; color: inherit; }
+
+input { 
+  padding: 10px; width: 120px; font-size: 35px; text-align: center; 
+  border-radius: 12px; border: 3px solid var(--naranja); background: #000; color: white;
+}
+
+.btn-add { 
+  padding: 15px 25px; border: none; border-radius: 12px; background: var(--naranja); 
+  color: white; font-weight: bold; font-size: 20px; cursor: pointer;
+}
+
+/* PANEL DERECHO: Tablero */
+.right {
+  flex: 1.8;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  height: 100%;
+}
+
+.column { 
+  background: rgba(255,255,255,0.03); 
+  border-radius: 10px; 
+  display: grid;
+  grid-template-rows: 1.5fr repeat(15, 1fr);
+  gap: 2px;
+  padding: 5px;
+}
+
+.column h2 { margin: 0; font-size: 5vh; text-align: center; align-self: center; }
+
+.cell { 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  border-radius: 5px; 
+  background: #222; 
+  font-weight: bold; 
+  font-size: 2.2vh; 
+  color: #444; 
+  border: 1px solid rgba(255,255,255,0.02);
+}
+
+.active { color: black !important; transform: scale(1.02); }
+
+/* BARRA DE BOTONES */
+.bottom-bar {
+  height: 100px;
+  background: #000;
+  border-top: 3px solid var(--naranja);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+}
+
+.btn { padding: 12px 30px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 18px; text-transform: uppercase; }
+.btn-undo { background: #444; color: white; }
+.btn-bingo { background: var(--rojo-bingo); color: white; font-size: 24px; animation: pulse 1.5s infinite; }
+
+@keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.05);} 100% {transform: scale(1);} }
+.win-flash { animation: flash-bg 0.4s infinite; }
+@keyframes flash-bg { 0%, 100% {background:#000;} 50% {background:var(--naranja);} }
+</style>
+</head>
+
+<body>
+
+<div class="background" id="bg"></div>
+
+<div class="main-area" id="screen">
+  <div class="left">
+    <img src="logo.png" class="logo" alt="Logo">
+    <div class="ball" id="ball">
+      <span id="ball-letter">-</span>
+      <div id="ball-num">--</div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <input type="number" id="numberInput" min="1" max="75" autofocus placeholder="00">
+      <button class="btn-add" onclick="addNumber()">OK</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="board" id="board"></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn btn-undo" onclick="undoNumber()">DESHACER ÚLTIMO</button>
+  <button class="btn btn-bingo" onclick="celebrateBingo()">¡SE GANÓ EL BINGO!</button>
+</div>
+
+<script>
+const ranges = { B:[1,15], I:[16,30], N:[31,45], G:[46,60], O:[61,75] };
+const colors = { B:"#0066ff", I:"#ff1a1a", N:"#ffffff", G:"#00cc44", O:"#ffcc00" };
+let history = [];
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+const board = document.getElementById("board");
+for(let letter in ranges){
+  const col = document.createElement("div");
+  col.className = "column";
+  const title = document.createElement("h2");
+  title.textContent = letter; title.style.color = colors[letter];
+  col.appendChild(title);
+  for(let i=ranges[letter][0]; i<=ranges[letter][1]; i++){
+    const cell = document.createElement("div");
+    cell.className = "cell"; cell.id = "num"+i; cell.textContent = i;
+    col.appendChild(cell);
+  }
+  board.appendChild(col);
+}
+
+function addNumber(){
+  const input = document.getElementById("numberInput");
+  const num = parseInt(input.value);
+  if(isNaN(num) || num<1 || num>75 || history.includes(num)) return;
+
+  let letter = "";
+  for(let l in ranges) if(num>=ranges[l][0] && num<=ranges[l][1]) letter = l;
+
+  const ball = document.getElementById("ball");
+  document.getElementById("ball-letter").textContent = letter;
+  document.getElementById("ball-num").textContent = num;
+  
+  // Cambiamos el fondo según la letra
+  ball.style.background = colors[letter];
+  
+  // FIX: Ajuste de color de fuente (negro para N y O para que la letra sea visible)
+  ball.style.color = (letter==="N" || letter==="O") ? "black" : "white";
+
+  const targetCell = document.getElementById("num"+num);
+  targetCell.style.background = colors[letter];
+  targetCell.classList.add("active");
+
+  playVariedSound();
+  history.push(num);
+  input.value = ""; input.focus();
+}
+
+function undoNumber(){
+  if(history.length === 0) return;
+  const last = history.pop();
+  const cell = document.getElementById("num"+last);
+  cell.style.background = "#222"; cell.classList.remove("active");
+  document.getElementById("ball-letter").textContent = "-";
+  document.getElementById("ball-num").textContent = "--";
+  document.getElementById("ball").style.background = "#222";
+  document.getElementById("ball").style.color = "white";
+}
+
+function playVariedSound() {
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const startFreq = 400 + Math.random() * 400; 
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(startFreq, now);
+  osc.frequency.exponentialRampToValueAtTime(startFreq * 2.2, now + 0.15);
+  gain.gain.setValueAtTime(0.1, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(now + 0.3);
+}
+
+function celebrateBingo() {
+  const sc = document.getElementById("screen");
+  sc.classList.add("win-flash");
+  setTimeout(() => sc.classList.remove("win-flash"), 6000);
+}
+
+const bg = document.getElementById("bg");
+for(let i=0; i<30; i++){
+  let span = document.createElement("span");
+  span.style.left = Math.random()*100+"%";
+  span.style.animationDuration = (6+Math.random()*6)+"s";
+  bg.appendChild(span);
+}
+
+document.addEventListener('click', () => { if(audioCtx.state === 'suspended') audioCtx.resume(); }, {once: true});
+document.getElementById("numberInput").addEventListener("keypress", (e) => {if(e.key === "Enter") addNumber();});
+</script>
+
+</body>
+</html>
